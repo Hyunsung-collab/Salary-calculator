@@ -14,6 +14,7 @@ import { SalarySettingsForm } from "@/features/salary-calculator/SalarySettingsF
 import { WorkTemplateForm } from "@/features/salary-calculator/WorkTemplateForm"
 import { SalaryAppNavigation, type AppSection } from "@/features/salary-calculator/SalaryAppNavigation"
 import { SalaryHome } from "@/features/salary-calculator/SalaryHome"
+import { StorageStatus } from "@/features/salary-calculator/StorageStatus"
 import { WorkSection } from "@/features/salary-calculator/work/WorkSection"
 import {
   clearSalaryData,
@@ -192,15 +193,7 @@ export function SalaryCalculator() {
                   />
                 </div>
                 <div className="text-sm">
-                  <p className="font-medium text-slate-700">
-                    {lastSavedAt ? "이 기기에 자동 저장됨" : "저장 준비 중"}
-                  </p>
-                  {lastSavedAt && (
-                    <p className="text-xs text-slate-500">
-                      마지막 저장: {new Date(lastSavedAt).toLocaleString("ko-KR")}
-                    </p>
-                  )}
-                  {storageError && <p className="text-xs text-red-600">{storageError}</p>}
+                  <StorageStatus lastSavedAt={lastSavedAt} error={storageError} />
                 </div>
               </CardContent>
             </Card>
@@ -224,7 +217,7 @@ export function SalaryCalculator() {
           </DialogHeader>
           <div className="flex justify-end gap-2 pt-4">
             <Button type="button" variant="outline" onClick={() => setResetOpen(false)}>취소</Button>
-            <Button type="button" onClick={resetData}>초기화</Button>
+            <Button type="button" variant="destructive" onClick={resetData}>초기화</Button>
           </div>
         </DialogContent>
       </Dialog>

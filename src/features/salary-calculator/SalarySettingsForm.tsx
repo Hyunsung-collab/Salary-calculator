@@ -116,8 +116,8 @@ function NumberField({
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
-      <Input id={id} type="number" inputMode="decimal" min={0} step="any" value={value} disabled={disabled} aria-invalid={Boolean(error)} onChange={onChange} />
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      <Input id={id} type="number" inputMode="decimal" min={0} step="any" value={value} disabled={disabled} aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined} onChange={onChange} />
+      {error && <p id={`${id}-error`} className="text-sm text-red-600">{error}</p>}
     </div>
   )
 }

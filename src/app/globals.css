@@ -9,8 +9,14 @@
   }
 
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    @apply overflow-x-hidden bg-slate-50 text-slate-900 antialiased;
   }
+}
+
+button,
+input,
+select {
+  font: inherit;
 }
 
 @media print {
@@ -29,4 +35,11 @@
 
 .print-only {
   display: none;
+}
+
+@media print {
+  .print-only {
+    color-adjust: exact;
+    print-color-adjust: exact;
+  }
 }

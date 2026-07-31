@@ -124,9 +124,10 @@ export function WorkEntryEditor({
               type="date"
               value={draft.date}
               aria-invalid={Boolean(errors.date)}
+              aria-describedby={errors.date ? "work-entry-date-error" : undefined}
               onChange={(event) => updateDraft("date", event.target.value)}
             />
-            {errors.date && <p className="text-sm text-red-600">{errors.date}</p>}
+            {errors.date && <p id="work-entry-date-error" className="text-sm text-red-600">{errors.date}</p>}
           </div>
 
           <fieldset className="space-y-2">
@@ -156,6 +157,7 @@ export function WorkEntryEditor({
                 className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
                 value={draft.startTime}
                 aria-invalid={Boolean(errors.startTime)}
+                aria-describedby={errors.startTime ? "work-entry-start-error" : undefined}
                 onChange={(event) => updateDraft("startTime", event.target.value)}
               >
                 <option value="">선택</option>
@@ -163,7 +165,7 @@ export function WorkEntryEditor({
                   <option key={value} value={value}>{value}</option>
                 ))}
               </select>
-              {errors.startTime && <p className="text-sm text-red-600">{errors.startTime}</p>}
+              {errors.startTime && <p id="work-entry-start-error" className="text-sm text-red-600">{errors.startTime}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="work-entry-end">퇴근 시간</Label>
@@ -172,6 +174,7 @@ export function WorkEntryEditor({
                 className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
                 value={draft.endTime}
                 aria-invalid={Boolean(errors.endTime)}
+                aria-describedby={errors.endTime ? "work-entry-end-error" : undefined}
                 onChange={(event) => updateDraft("endTime", event.target.value)}
               >
                 <option value="">선택</option>
@@ -179,7 +182,7 @@ export function WorkEntryEditor({
                   <option key={value} value={value}>{value}</option>
                 ))}
               </select>
-              {errors.endTime && <p className="text-sm text-red-600">{errors.endTime}</p>}
+              {errors.endTime && <p id="work-entry-end-error" className="text-sm text-red-600">{errors.endTime}</p>}
             </div>
           </div>
 
@@ -192,9 +195,10 @@ export function WorkEntryEditor({
               min={0}
               value={draft.breakMinutes}
               aria-invalid={Boolean(errors.breakMinutes)}
+              aria-describedby={errors.breakMinutes ? "work-entry-break-error" : undefined}
               onChange={(event) => updateDraft("breakMinutes", Number(event.target.value))}
             />
-            {errors.breakMinutes && <p className="text-sm text-red-600">{errors.breakMinutes}</p>}
+            {errors.breakMinutes && <p id="work-entry-break-error" className="text-sm text-red-600">{errors.breakMinutes}</p>}
           </div>
 
           {crossesMidnight && (

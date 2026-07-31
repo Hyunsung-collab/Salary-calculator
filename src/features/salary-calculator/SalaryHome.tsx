@@ -8,6 +8,7 @@ import { clampMinutes, diffMinutes, formatMinutesToHours } from "@/lib/time"
 import { formatCurrency } from "@/lib/format"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { StorageStatus } from "@/features/salary-calculator/StorageStatus"
 
 type SalaryHomeProps = {
   entries: WorkEntry[]
@@ -171,11 +172,7 @@ export function SalaryHome({
         </Card>
       </section>
 
-      <p className="text-xs text-slate-500">
-        {lastSavedAt
-          ? `이 기기에 자동 저장됨 · ${new Date(lastSavedAt).toLocaleString("ko-KR")}`
-          : "저장 준비 중"}
-      </p>
+      <StorageStatus lastSavedAt={lastSavedAt} />
 
       <p className="sr-only">
         현재 전체 기록 기준 실수령액은 {formatCurrency(breakdown.netPay)}입니다.
