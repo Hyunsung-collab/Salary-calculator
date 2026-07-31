@@ -6,12 +6,15 @@ import { FileDown, FileSpreadsheet, FileUp, RotateCcw } from "lucide-react"
 import type { SalarySettings, WorkEntry } from "@/types/salary"
 import { useSalary } from "@/hooks/useSalary"
 import { ExcelMapperModal } from "@/components/ExcelMapperModal"
-import { WorkLogForm } from "@/components/WorkLogForm"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { SalaryResultSection } from "@/features/salary-calculator/SalaryResultSection"
 import { SalarySettingsForm } from "@/features/salary-calculator/SalarySettingsForm"
 import { WorkTemplateForm } from "@/features/salary-calculator/WorkTemplateForm"
+import { SalaryAppNavigation, type AppSection } from "@/features/salary-calculator/SalaryAppNavigation"
+import { SalaryHome } from "@/features/salary-calculator/SalaryHome"
+import { WorkSection } from "@/features/salary-calculator/work/WorkSection"
 import {
   clearSalaryData,
   downloadSalaryBackup,
@@ -46,6 +49,8 @@ export function SalaryCalculator() {
   const [isHydrated, setIsHydrated] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
   const [storageError, setStorageError] = useState("")
+  const [resetOpen, setResetOpen] = useState(false)
+  const [section, setSection] = useState<AppSection>("home")
   const backupInputRef = useRef<HTMLInputElement>(null)
   const { breakdown } = useSalary(entries, settings)
 
@@ -78,12 +83,12 @@ export function SalaryCalculator() {
   }
 
   const resetData = () => {
-    if (!window.confirm("근무 기록과 급여 설정을 모두 초기화할까요?")) return
     setEntries([])
     setSettings(defaultSettings)
     clearSalaryData()
     setLastSavedAt(null)
     setStorageError("")
+    setResetOpen(false)
   }
 
   const handleBackupRestore = async (file: File | undefined) => {
@@ -100,50 +105,93 @@ export function SalaryCalculator() {
     }
   }
 
+  const addTemplateEntries = (newEntries: WorkEntry[]) =>
+    setEntries((prev) => [...prev, ...newEntries])
+
   return (
     <main className="min-h-screen bg-slate-50">
-      <section className="mx-auto max-w-6xl space-y-6 px-4 py-8 no-print">
-        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">하이브리드 급여 계산기</h1>
-            <p className="text-sm text-slate-500">
-              수동 입력 or 엑셀 임포트를 함께 사용한 급여 계산기
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setMapperOpen(true)}>
-              <FileSpreadsheet className="h-4 w-4" /> 엑셀 매핑
-            </Button>
-            <Button variant="outline" onClick={() => downloadSalaryBackup(entries, settings)}>
-              <FileDown className="h-4 w-4" /> JSON 백업
-            </Button>
-            <Button variant="outline" onClick={() => backupInputRef.current?.click()}>
-              <FileUp className="h-4 w-4" /> JSON 복원
-            </Button>
-            <input
-              ref={backupInputRef}
-              type="file"
-              accept="application/json,.json"
-              className="hidden"
-              onChange={(event) => void handleBackupRestore(event.target.files?.[0])}
-            />
-          </div>
-        </header>
+      <div className="no-print border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
+          <p className="text-lg font-semibold text-slate-900">하이브리드 급여 계산기</p>
+          <SalaryAppNavigation section={section} onSectionChange={setSection} />
+        </div>
+      </div>
 
-        <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+      <section className="mx-auto max-w-6xl px-4 py-6 pb-24 md:py-8 md:pb-8">
+        {section === "home" && (
+          <SalaryHome
+            entries={entries}
+            settings={settings}
+            breakdown={breakdown}
+            lastSavedAt={lastSavedAt}
+            onGoToWork={() => setSection("work")}
+            onGoToSalary={() => setSection("salary")}
+            onGoToSettings={() => setSection("more")}
+          />
+        )}
+
+        {section === "work" && (
+          <WorkSection
+            entries={entries}
+            settings={settings}
+            onChange={setEntries}
+            onAddEntries={addTemplateEntries}
+            onOpenExcel={() => setMapperOpen(true)}
+          />
+        )}
+
+        {section === "salary" && (
           <div className="space-y-6">
+            <header>
+              <p className="text-sm font-medium text-slate-500">급여</p>
+              <h1 className="mt-1 text-2xl font-semibold">급여 상세</h1>
+            </header>
+            <SalaryResultSection breakdown={breakdown} settings={settings} entries={entries} />
+          </div>
+        )}
+
+        {section === "more" && (
+          <div className="space-y-6">
+            <header>
+              <p className="text-sm font-medium text-slate-500">전체</p>
+              <h1 className="mt-1 text-2xl font-semibold">설정 및 데이터 관리</h1>
+            </header>
             <Card>
               <CardHeader>
-                <CardTitle>근무 기록 입력</CardTitle>
+                <CardTitle>급여 설정</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 <SalarySettingsForm settings={settings} onChange={setSettings} />
-                <WorkLogForm entries={entries} onChange={setEntries} />
               </CardContent>
             </Card>
+            <WorkTemplateForm onAddEntries={addTemplateEntries} />
             <Card>
-              <CardContent className="flex flex-col gap-3 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
-                <div>
+              <CardHeader>
+                <CardTitle>데이터 관리</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={() => setMapperOpen(true)}>
+                    <FileSpreadsheet className="h-4 w-4" /> Excel 불러오기
+                  </Button>
+                  <Button variant="outline" onClick={() => downloadSalaryBackup(entries, settings)}>
+                    <FileDown className="h-4 w-4" /> JSON 백업
+                  </Button>
+                  <Button variant="outline" onClick={() => backupInputRef.current?.click()}>
+                    <FileUp className="h-4 w-4" /> JSON 복원
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => setResetOpen(true)}>
+                    <RotateCcw className="h-4 w-4" /> 전체 초기화
+                  </Button>
+                  <input
+                    ref={backupInputRef}
+                    type="file"
+                    accept="application/json,.json"
+                    className="hidden"
+                    onChange={(event) => void handleBackupRestore(event.target.files?.[0])}
+                  />
+                </div>
+                <div className="text-sm">
                   <p className="font-medium text-slate-700">
                     {lastSavedAt ? "이 기기에 자동 저장됨" : "저장 준비 중"}
                   </p>
@@ -154,15 +202,10 @@ export function SalaryCalculator() {
                   )}
                   {storageError && <p className="text-xs text-red-600">{storageError}</p>}
                 </div>
-                <Button type="button" variant="outline" onClick={resetData}>
-                  <RotateCcw className="h-4 w-4" /> 전체 초기화
-                </Button>
               </CardContent>
             </Card>
-            <WorkTemplateForm onAddEntries={(newEntries) => setEntries((prev) => [...prev, ...newEntries])} />
           </div>
-          <SalaryResultSection breakdown={breakdown} settings={settings} entries={entries} />
-        </div>
+        )}
       </section>
 
       <ExcelMapperModal
@@ -170,6 +213,21 @@ export function SalaryCalculator() {
         onOpenChange={setMapperOpen}
         onImport={handleImport}
       />
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>모든 데이터를 초기화할까요?</DialogTitle>
+            <DialogDescription>
+              근무 기록과 급여 설정이 이 기기에서 삭제되고 기본 설정으로 돌아갑니다.
+              JSON 백업 파일은 삭제되지 않습니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={() => setResetOpen(false)}>취소</Button>
+            <Button type="button" onClick={resetData}>초기화</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </main>
   )
 }
