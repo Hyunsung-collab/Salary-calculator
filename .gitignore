@@ -33,3 +33,9 @@ logs/
 *.temp
 .tmp/
 temp/
+
+# typescript
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+.vscode/

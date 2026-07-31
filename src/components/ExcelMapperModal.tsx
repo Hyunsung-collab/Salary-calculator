@@ -130,7 +130,7 @@ export function ExcelMapperModal({ open, onOpenChange, onImport }: ExcelMapperMo
             업로드한 파일의 헤더를 선택해 근무 입력 항목과 연결하세요.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 p-4 text-sm text-slate-500 hover:border-slate-400">
             <FileUp className="h-4 w-4" /> 엑셀 파일 업로드
             <input
@@ -141,7 +141,7 @@ export function ExcelMapperModal({ open, onOpenChange, onImport }: ExcelMapperMo
             />
           </label>
           {headers.length > 0 && (
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid min-w-0 gap-3 md:grid-cols-2">
               {mappingFields.map((field) => (
                 <div key={field} className="space-y-2">
                   <p className="text-sm font-medium text-slate-700">{FIELD_LABELS[field]}</p>

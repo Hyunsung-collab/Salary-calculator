@@ -29,7 +29,7 @@ export function SalarySummary({ breakdown }: SalarySummaryProps) {
         <div className="space-y-2 text-sm text-slate-600">
           <div className="flex items-center justify-between">
             <span>기본급</span>
-            <span className="font-medium text-slate-900">{formatCurrency(breakdown.basePay)}</span>
+            <span className="break-all text-right font-medium text-slate-900">{formatCurrency(breakdown.basePay)}</span>
           </div>
           <div className="flex items-center justify-between">
             <span>연장수당</span>
