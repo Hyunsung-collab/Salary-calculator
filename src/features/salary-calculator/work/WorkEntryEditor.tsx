@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 
 import type { SalaryBreakdown, SalarySettings, WorkEntry } from "@/types/salary"
 import { calculateSalary } from "@/salary/calculateSalary"
+import { getDefaultDateForMonth } from "@/lib/month"
 import {
   HALF_HOUR_OPTIONS,
   clampMinutes,
@@ -26,6 +27,7 @@ type WorkEntryEditorProps = {
   open: boolean
   entry: WorkEntry | null
   settings: SalarySettings
+  selectedMonth: string
   onOpenChange: (open: boolean) => void
   onSave: (entry: WorkEntry) => WorkEntrySaveResult
 }
@@ -35,21 +37,14 @@ type WorkEntrySaveResult =
   | { ok: true }
   | { ok: false; messages: string[] }
 
-const today = () => {
-  const value = new Date()
-  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(
-    value.getDate()
-  ).padStart(2, "0")}`
-}
-
 function createId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random()}`
 }
 
-function emptyDraft(): DraftEntry {
-  return { date: today(), startTime: "09:00", endTime: "18:00", breakMinutes: 60 }
+function emptyDraft(selectedMonth: string): DraftEntry {
+  return { date: getDefaultDateForMonth(selectedMonth), startTime: "09:00", endTime: "18:00", breakMinutes: 60 }
 }
 
 function getPreviewBreakdown(draft: DraftEntry, settings: SalarySettings): SalaryBreakdown | null {
@@ -65,20 +60,26 @@ export function WorkEntryEditor({
   open,
   entry,
   settings,
+  selectedMonth,
   onOpenChange,
   onSave
 }: WorkEntryEditorProps) {
-  const [draft, setDraft] = useState<DraftEntry>(emptyDraft)
+  const [draft, setDraft] = useState<DraftEntry>(() => emptyDraft(selectedMonth))
   const [errors, setErrors] = useState<Partial<Record<keyof DraftEntry, string>>>({})
   const [formMessages, setFormMessages] = useState<string[]>([])
+  const [noBreak, setNoBreak] = useState(false)
+  const [lastBreakMinutes, setLastBreakMinutes] = useState(60)
 
   useEffect(() => {
     if (open) {
-      setDraft(entry ? { ...entry } : emptyDraft())
+      const nextDraft = entry ? { ...entry } : emptyDraft(selectedMonth)
+      setDraft(nextDraft)
+      setNoBreak(nextDraft.breakMinutes === 0)
+      setLastBreakMinutes(nextDraft.breakMinutes > 0 ? nextDraft.breakMinutes : 60)
       setErrors({})
       setFormMessages([])
     }
-  }, [entry, open])
+  }, [entry, open, selectedMonth])
 
   const preview = useMemo(() => getPreviewBreakdown(draft, settings), [draft, settings])
   const crossesMidnight =
@@ -89,6 +90,28 @@ export function WorkEntryEditor({
   const updateDraft = <K extends keyof DraftEntry>(key: K, value: DraftEntry[K]) => {
     setDraft((previous) => ({ ...previous, [key]: value }))
     setErrors((previous) => ({ ...previous, [key]: undefined }))
+    setFormMessages([])
+  }
+
+  const updateBreakMinutes = (value: number) => {
+    updateDraft("breakMinutes", value)
+    if (Number.isFinite(value) && value > 0) {
+      setLastBreakMinutes(value)
+    }
+  }
+
+  const toggleNoBreak = (checked: boolean) => {
+    setNoBreak(checked)
+    setDraft((previous) => {
+      if (checked) {
+        if (previous.breakMinutes > 0) {
+          setLastBreakMinutes(previous.breakMinutes)
+        }
+        return { ...previous, breakMinutes: 0 }
+      }
+      return { ...previous, breakMinutes: lastBreakMinutes || 60 }
+    })
+    setErrors((previous) => ({ ...previous, breakMinutes: undefined }))
     setFormMessages([])
   }
 
@@ -148,6 +171,8 @@ export function WorkEntryEditor({
                 variant="outline"
                 onClick={() => {
                   setDraft((previous) => ({ ...previous, startTime: "09:00", endTime: "18:00", breakMinutes: 60 }))
+                  setNoBreak(false)
+                  setLastBreakMinutes(60)
                   setFormMessages([])
                 }}
               >
@@ -207,10 +232,20 @@ export function WorkEntryEditor({
               inputMode="numeric"
               min={0}
               value={draft.breakMinutes}
+              disabled={noBreak}
               aria-invalid={Boolean(errors.breakMinutes)}
               aria-describedby={errors.breakMinutes ? "work-entry-break-error" : undefined}
-              onChange={(event) => updateDraft("breakMinutes", Number(event.target.value))}
+              onChange={(event) => updateBreakMinutes(Number(event.target.value))}
             />
+            <label className="flex min-h-10 items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300"
+                checked={noBreak}
+                onChange={(event) => toggleNoBreak(event.target.checked)}
+              />
+              휴게시간 없음
+            </label>
             {errors.breakMinutes && <p id="work-entry-break-error" className="text-sm text-red-600">{errors.breakMinutes}</p>}
           </div>
 

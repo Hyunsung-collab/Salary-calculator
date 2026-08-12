@@ -15,7 +15,7 @@ const items: Array<{ id: AppSection; label: string; Icon: typeof House }> = [
   { id: "home", label: "홈", Icon: House },
   { id: "work", label: "근무", Icon: BriefcaseBusiness },
   { id: "salary", label: "급여", Icon: WalletCards },
-  { id: "more", label: "전체", Icon: Menu }
+  { id: "more", label: "설정", Icon: Menu }
 ]
 
 export function SalaryAppNavigation({

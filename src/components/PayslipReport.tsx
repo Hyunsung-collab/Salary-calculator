@@ -1,4 +1,5 @@
 import { formatCurrency } from "@/lib/format"
+import { getMonthParts } from "@/lib/month"
 import { formatMinutesToHours } from "@/lib/time"
 import type { SalaryBreakdown, SalarySettings, WorkEntry } from "@/types/salary"
 
@@ -6,19 +7,11 @@ type PayslipReportProps = {
   breakdown: SalaryBreakdown
   settings: SalarySettings
   entries: WorkEntry[]
+  selectedMonth: string
 }
 
-function getReportMonth(entries: WorkEntry[]) {
-  const firstDate = entries.find((entry) => entry.date)?.date
-  const baseDate = firstDate ? new Date(`${firstDate}T00:00:00`) : new Date()
-  return {
-    year: baseDate.getFullYear(),
-    month: baseDate.getMonth() + 1
-  }
-}
-
-export function PayslipReport({ breakdown, settings, entries }: PayslipReportProps) {
-  const reportDate = getReportMonth(entries)
+export function PayslipReport({ breakdown, settings, selectedMonth }: PayslipReportProps) {
+  const reportDate = getMonthParts(selectedMonth)
   const taxableExtras = breakdown.overtimePay + breakdown.nightPay + breakdown.bonusAllowance
   const deductionSubtotal =
     breakdown.pension +
