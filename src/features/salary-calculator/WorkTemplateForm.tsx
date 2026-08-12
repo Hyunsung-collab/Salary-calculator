@@ -1,9 +1,10 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import type { WorkEntry } from "@/types/salary"
 import { HALF_HOUR_OPTIONS } from "@/lib/time"
+import { ActionToast, type ActionToastTone } from "@/components/ui/action-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -15,8 +16,18 @@ type WorkTemplate = {
   breakMinutes: number
 }
 
+export type AddWorkEntriesResult = {
+  addedCount: number
+  skippedCount: number
+}
+
 type WorkTemplateFormProps = {
-  onAddEntries: (entries: WorkEntry[]) => void
+  onAddEntries: (entries: WorkEntry[]) => AddWorkEntriesResult
+}
+
+type TemplateFeedback = {
+  messages: string[]
+  tone: ActionToastTone
 }
 
 export function WorkTemplateForm({ onAddEntries }: WorkTemplateFormProps) {
@@ -24,11 +35,18 @@ export function WorkTemplateForm({ onAddEntries }: WorkTemplateFormProps) {
   const [rangeEnd, setRangeEnd] = useState("")
   const [templateWeekdays, setTemplateWeekdays] = useState<number[]>([])
   const [templateByDay, setTemplateByDay] = useState<Record<number, WorkTemplate>>({})
+  const [feedback, setFeedback] = useState<TemplateFeedback | null>(null)
   const weekdayLabels = useMemo(() => ["일", "월", "화", "수", "목", "금", "토"], [])
   const defaultTemplate = useMemo(
     () => ({ startTime: "09:00", endTime: "18:00", breakMinutes: 60 }),
     []
   )
+
+  useEffect(() => {
+    if (!feedback) return
+    const timeout = window.setTimeout(() => setFeedback(null), 3000)
+    return () => window.clearTimeout(timeout)
+  }, [feedback])
 
   const createEntry = (date: string, day: number): WorkEntry => {
     const id =
@@ -60,7 +78,27 @@ export function WorkTemplateForm({ onAddEntries }: WorkTemplateFormProps) {
       cursor.setDate(cursor.getDate() + 1)
     }
 
-    onAddEntries(newEntries)
+    if (newEntries.length === 0) return
+
+    const result = onAddEntries(newEntries)
+    const messages: string[] = []
+
+    if (result.addedCount > 0) {
+      messages.push(`${result.addedCount}건의 근무를 추가했어요.`)
+    } else if (result.skippedCount > 0) {
+      messages.push("추가된 근무가 없어요.")
+    }
+
+    if (result.skippedCount > 0) {
+      messages.push(`${result.skippedCount}건은 기존 근무시간과 겹쳐 제외했어요.`)
+    }
+
+    if (messages.length > 0) {
+      setFeedback({
+        messages,
+        tone: result.skippedCount > 0 ? "warning" : "success"
+      })
+    }
   }
 
   return (
@@ -191,6 +229,7 @@ export function WorkTemplateForm({ onAddEntries }: WorkTemplateFormProps) {
           </Button>
         </div>
       </CardContent>
+      {feedback && <ActionToast messages={feedback.messages} tone={feedback.tone} />}
     </Card>
   )
 }

@@ -27,10 +27,13 @@ type WorkEntryEditorProps = {
   entry: WorkEntry | null
   settings: SalarySettings
   onOpenChange: (open: boolean) => void
-  onSave: (entry: WorkEntry) => void
+  onSave: (entry: WorkEntry) => WorkEntrySaveResult
 }
 
 type DraftEntry = Omit<WorkEntry, "id">
+type WorkEntrySaveResult =
+  | { ok: true }
+  | { ok: false; messages: string[] }
 
 const today = () => {
   const value = new Date()
@@ -67,11 +70,13 @@ export function WorkEntryEditor({
 }: WorkEntryEditorProps) {
   const [draft, setDraft] = useState<DraftEntry>(emptyDraft)
   const [errors, setErrors] = useState<Partial<Record<keyof DraftEntry, string>>>({})
+  const [formMessages, setFormMessages] = useState<string[]>([])
 
   useEffect(() => {
     if (open) {
       setDraft(entry ? { ...entry } : emptyDraft())
       setErrors({})
+      setFormMessages([])
     }
   }, [entry, open])
 
@@ -84,6 +89,7 @@ export function WorkEntryEditor({
   const updateDraft = <K extends keyof DraftEntry>(key: K, value: DraftEntry[K]) => {
     setDraft((previous) => ({ ...previous, [key]: value }))
     setErrors((previous) => ({ ...previous, [key]: undefined }))
+    setFormMessages([])
   }
 
   const validate = () => {
@@ -103,7 +109,11 @@ export function WorkEntryEditor({
 
   const handleSave = () => {
     if (!validate()) return
-    onSave({ id: entry?.id ?? createId(), ...draft })
+    const result = onSave({ id: entry?.id ?? createId(), ...draft })
+    if (!result.ok) {
+      setFormMessages(result.messages)
+      return
+    }
     onOpenChange(false)
   }
 
@@ -136,7 +146,10 @@ export function WorkEntryEditor({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setDraft((previous) => ({ ...previous, startTime: "09:00", endTime: "18:00", breakMinutes: 60 }))}
+                onClick={() => {
+                  setDraft((previous) => ({ ...previous, startTime: "09:00", endTime: "18:00", breakMinutes: 60 }))
+                  setFormMessages([])
+                }}
               >
                 기본 근무
               </Button>
@@ -219,6 +232,14 @@ export function WorkEntryEditor({
               </div>
             )}
           </div>
+
+          {formMessages.length > 0 && (
+            <div role="alert" className="space-y-1 rounded-md bg-red-50 p-3 text-sm text-red-700">
+              {formMessages.map((message) => (
+                <p key={message}>{message}</p>
+              ))}
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

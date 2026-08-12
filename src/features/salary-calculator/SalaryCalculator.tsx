@@ -12,10 +12,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { SalaryResultSection } from "@/features/salary-calculator/SalaryResultSection"
 import { SalarySettingsForm } from "@/features/salary-calculator/SalarySettingsForm"
 import { WorkTemplateForm } from "@/features/salary-calculator/WorkTemplateForm"
+import type { AddWorkEntriesResult } from "@/features/salary-calculator/WorkTemplateForm"
 import { SalaryAppNavigation, type AppSection } from "@/features/salary-calculator/SalaryAppNavigation"
 import { SalaryHome } from "@/features/salary-calculator/SalaryHome"
 import { StorageStatus } from "@/features/salary-calculator/StorageStatus"
 import { WorkSection } from "@/features/salary-calculator/work/WorkSection"
+import { findWorkEntryConflict } from "@/salary/workEntryConflicts"
 import {
   clearSalaryData,
   downloadSalaryBackup,
@@ -106,8 +108,25 @@ export function SalaryCalculator() {
     }
   }
 
-  const addTemplateEntries = (newEntries: WorkEntry[]) =>
-    setEntries((prev) => [...prev, ...newEntries])
+  const addTemplateEntries = (newEntries: WorkEntry[]): AddWorkEntriesResult => {
+    const acceptedEntries: WorkEntry[] = []
+
+    newEntries.forEach((entry) => {
+      const conflict = findWorkEntryConflict([...entries, ...acceptedEntries], entry)
+      if (!conflict) {
+        acceptedEntries.push(entry)
+      }
+    })
+
+    if (acceptedEntries.length > 0) {
+      setEntries([...entries, ...acceptedEntries])
+    }
+
+    return {
+      addedCount: acceptedEntries.length,
+      skippedCount: newEntries.length - acceptedEntries.length
+    }
+  }
 
   return (
     <main className="min-h-screen bg-slate-50">

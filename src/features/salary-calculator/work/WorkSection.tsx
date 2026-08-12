@@ -1,10 +1,12 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { ChevronLeft, ChevronRight, FileSpreadsheet, Plus, Trash2 } from "lucide-react"
 
 import type { SalarySettings, WorkEntry } from "@/types/salary"
 import { clampMinutes, diffMinutes, formatMinutesToHours } from "@/lib/time"
+import { findWorkEntryConflict } from "@/salary/workEntryConflicts"
+import { ActionToast, type ActionToastTone } from "@/components/ui/action-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -16,14 +18,19 @@ import {
 } from "@/components/ui/dialog"
 import { WorkEntryCard } from "@/features/salary-calculator/work/WorkEntryCard"
 import { WorkEntryEditor } from "@/features/salary-calculator/work/WorkEntryEditor"
-import { WorkTemplateForm } from "@/features/salary-calculator/WorkTemplateForm"
+import { WorkTemplateForm, type AddWorkEntriesResult } from "@/features/salary-calculator/WorkTemplateForm"
 
 type WorkSectionProps = {
   entries: WorkEntry[]
   settings: SalarySettings
   onChange: (entries: WorkEntry[]) => void
-  onAddEntries: (entries: WorkEntry[]) => void
+  onAddEntries: (entries: WorkEntry[]) => AddWorkEntriesResult
   onOpenExcel: () => void
+}
+
+type WorkFeedback = {
+  messages: string[]
+  tone: ActionToastTone
 }
 
 function currentMonth() {
@@ -48,6 +55,13 @@ export function WorkSection({
   const [editorOpen, setEditorOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<WorkEntry | null>(null)
   const [deleteEntry, setDeleteEntry] = useState<WorkEntry | null>(null)
+  const [feedback, setFeedback] = useState<WorkFeedback | null>(null)
+
+  useEffect(() => {
+    if (!feedback) return
+    const timeout = window.setTimeout(() => setFeedback(null), 3000)
+    return () => window.clearTimeout(timeout)
+  }, [feedback])
 
   const monthEntries = useMemo(
     () =>
@@ -70,11 +84,28 @@ export function WorkSection({
   }
 
   const saveEntry = (savedEntry: WorkEntry) => {
+    const conflict = findWorkEntryConflict(entries, savedEntry, savedEntry.id)
+    if (conflict) {
+      return {
+        ok: false as const,
+        messages: [
+          "기존 근무시간과 겹쳐요.",
+          `기존 근무 ${conflict.entry.date} ${conflict.entry.startTime}~${conflict.entry.endTime}`,
+          "겹치지 않는 시간으로 수정해주세요."
+        ]
+      }
+    }
+
     onChange(
       editingEntry
         ? entries.map((entry) => (entry.id === savedEntry.id ? savedEntry : entry))
         : [...entries, savedEntry]
     )
+    setFeedback({
+      messages: [editingEntry ? "근무 기록을 수정했어요." : "근무가 추가됐어요."],
+      tone: "success"
+    })
+    return { ok: true as const }
   }
 
   const confirmDelete = () => {
@@ -156,6 +187,8 @@ export function WorkSection({
           </div>
         </DialogContent>
       </Dialog>
+
+      {feedback && <ActionToast messages={feedback.messages} tone={feedback.tone} />}
     </div>
   )
 }
