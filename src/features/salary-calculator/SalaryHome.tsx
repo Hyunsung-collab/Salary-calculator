@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { ArrowRight, Plus } from "lucide-react"
 
 import type { SalaryBreakdown, SalarySettings, WorkEntry } from "@/types/salary"
@@ -8,7 +8,7 @@ import { clampMinutes, diffMinutes, formatMinutesToHours } from "@/lib/time"
 import { formatCurrency } from "@/lib/format"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ActionToast, type ActionToastTone } from "@/components/ui/action-toast"
+import type { ActionToastTone } from "@/components/ui/action-toast"
 import { SalarySettingsForm } from "@/features/salary-calculator/SalarySettingsForm"
 import { WorkCalendar } from "@/features/salary-calculator/WorkCalendar"
 import { StorageStatus } from "@/features/salary-calculator/StorageStatus"
@@ -32,13 +32,9 @@ type SalaryHomeProps = {
   onConfirmSetupSettings: () => void
   onAddTemplateEntries: (entries: WorkEntry[]) => AddWorkEntriesResult
   onStartSetupDirectWork: () => void
+  onFeedback: (messages: string[], tone?: ActionToastTone) => void
   showGuidedSetup: boolean
   setupStep: SetupStep
-}
-
-type SetupFeedback = {
-  messages: string[]
-  tone: ActionToastTone
 }
 
 const setupSteps: Array<[SetupStep, string]> = [
@@ -76,11 +72,11 @@ export function SalaryHome({
   onConfirmSetupSettings,
   onAddTemplateEntries,
   onStartSetupDirectWork,
+  onFeedback,
   showGuidedSetup,
   setupStep
 }: SalaryHomeProps) {
   const [settingsValid, setSettingsValid] = useState(true)
-  const [setupFeedback, setSetupFeedback] = useState<SetupFeedback | null>(null)
   const recentEntries = [...entries]
     .filter((entry) => entry.date && entry.startTime && entry.endTime)
     .sort((a, b) => `${b.date} ${b.startTime}`.localeCompare(`${a.date} ${a.startTime}`))
@@ -90,19 +86,13 @@ export function SalaryHome({
   const hasMonthEntries = entries.length > 0
   const shortMonthLabel = `${Number(selectedMonth.slice(5, 7))}월`
 
-  useEffect(() => {
-    if (!setupFeedback) return
-    const timeout = window.setTimeout(() => setSetupFeedback(null), 3500)
-    return () => window.clearTimeout(timeout)
-  }, [setupFeedback])
-
   const handleTemplateComplete = (
     result: AddWorkEntriesResult,
     messages: string[],
     tone: ActionToastTone
   ) => {
-    setSetupFeedback({ messages, tone })
     if (result.addedCount > 0) {
+      onFeedback(messages, tone)
       window.scrollTo({ top: 0, behavior: "smooth" })
     }
   }
@@ -193,8 +183,6 @@ export function SalaryHome({
           )}
 
         </section>
-
-        {setupFeedback && <ActionToast messages={setupFeedback.messages} tone={setupFeedback.tone} />}
       </div>
     )
   }
@@ -331,8 +319,6 @@ export function SalaryHome({
         </Card>
       </section>
       )}
-
-      {setupFeedback && <ActionToast messages={setupFeedback.messages} tone={setupFeedback.tone} />}
       <StorageStatus lastSavedAt={lastSavedAt} />
 
       <p className="sr-only">

@@ -6,6 +6,8 @@ import { FileDown, FileSpreadsheet, FileUp, RotateCcw } from "lucide-react"
 import type { SalarySettings, WorkEntry } from "@/types/salary"
 import { useSalary } from "@/hooks/useSalary"
 import { ExcelMapperModal } from "@/components/ExcelMapperModal"
+import { ActionToast, type ActionToastTone } from "@/components/ui/action-toast"
+import { GuidedIntro } from "@/features/salary-calculator/GuidedIntro"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -93,6 +95,17 @@ export function SalaryCalculator() {
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthKey)
   const [workEditorRequestId, setWorkEditorRequestId] = useState<number | null>(null)
   const [setupDirectEditorOpen, setSetupDirectEditorOpen] = useState(false)
+  const [introCompleted, setIntroCompleted] = useState(false)
+  const [feedback, setFeedback] = useState<{ id: number; messages: string[]; tone: ActionToastTone } | null>(null)
+  const feedbackId = useRef(0)
+  const notify = useCallback((messages: string[], tone: ActionToastTone = "success") => {
+    setFeedback({ id: ++feedbackId.current, messages, tone })
+  }, [])
+  useEffect(() => {
+    if (!feedback) return
+    const timer = window.setTimeout(() => setFeedback(null), 5000)
+    return () => window.clearTimeout(timer)
+  }, [feedback])
   const [setupCompleted, setSetupCompleted] = useState(false)
   const [setupStep, setSetupStep] = useState<SetupStep>("settings")
   const [setupSettingsDraft, setSetupSettingsDraft] = useState<SalarySettings>(appDefaultSettings)
@@ -126,6 +139,7 @@ export function SalaryCalculator() {
     const legacyExistingUser = !preferences.hadStoredPreferences && Boolean(saved?.entries.length)
     const nextSetupCompleted = preferences.setupCompleted || legacyExistingUser ||
       (preferences.setupStep === "result" && Boolean(saved?.entries.length))
+    setIntroCompleted(preferences.introCompleted || legacyExistingUser || nextSetupCompleted)
     setSetupCompleted(nextSetupCompleted)
     const resumedStep = preferences.setupStep === "result" ? "work" : preferences.setupStep
     setSetupStep(nextSetupCompleted ? "result" : saved ? resumedStep : "settings")
@@ -149,8 +163,12 @@ export function SalaryCalculator() {
 
   useEffect(() => {
     if (!isHydrated) return
-    saveSalaryUiPreferences({ setupCompleted, setupStep })
-  }, [isHydrated, setupCompleted, setupStep])
+    try {
+      saveSalaryUiPreferences({ introCompleted, setupCompleted, setupStep })
+    } catch {
+      notify(["사용 단계 저장에 실패했어요. 새로고침하면 안내가 다시 나타날 수 있어요."], "error")
+    }
+  }, [introCompleted, isHydrated, setupCompleted, setupStep, notify])
 
   const materializeSettingsSnapshots = useCallback(
     (targetEntries: WorkEntry[], baseSettings = defaultSettings) => {
@@ -168,7 +186,7 @@ export function SalaryCalculator() {
     }))
   }, [])
 
-  const handleImport = (imported: WorkEntry[], hourlyWage?: number) => {
+  const handleImport = (imported: WorkEntry[], hourlyWage?: number, skippedCount = 0) => {
     const nextDefaultSettings = hourlyWage
       ? { ...defaultSettings, hourlyWage }
       : defaultSettings
@@ -178,9 +196,23 @@ export function SalaryCalculator() {
       setDefaultSettings(nextDefaultSettings)
     }
     materializeSettingsSnapshots(imported, nextDefaultSettings)
+    const importedMonths = getMonthKeysFromEntries(imported).sort()
+    if (!importedMonths.includes(selectedMonth) && importedMonths.length) {
+      setSelectedMonth(importedMonths[importedMonths.length - 1])
+    }
+    setSection("home")
+    notify([skippedCount > 0 ? `${imported.length}개를 불러왔고, ${skippedCount}개는 형식을 확인해 주세요.` : `${imported.length}개의 근무 기록을 불러왔어요.`], skippedCount > 0 ? "warning" : "success")
   }
 
   const resetData = () => {
+    try {
+      clearSalaryData()
+    } catch {
+      setStorageError("초기화하지 못했어요. 이 기기의 저장소 접근 상태를 확인해 주세요.")
+      setResetOpen(false)
+      notify(["초기화하지 못했어요. 기존 데이터는 유지돼요."], "error")
+      return
+    }
     setEntries([])
     setDefaultSettings(appDefaultSettings)
     setSettingsByMonth({})
@@ -191,11 +223,10 @@ export function SalaryCalculator() {
     setSetupSettingsDraft(appDefaultSettings)
     setSetupDirectEditorOpen(false)
     setWorkEditorRequestId(null)
-    saveSalaryUiPreferences({ setupCompleted: false, setupStep: "settings" })
-    clearSalaryData()
     setLastSavedAt(null)
     setStorageError("")
     setResetOpen(false)
+    notify(["근무 기록과 급여 조건을 초기화했어요. 급여 조건부터 다시 입력해 주세요."])
   }
 
   const handleBackupRestore = async (file: File | undefined) => {
@@ -252,6 +283,7 @@ export function SalaryCalculator() {
     updateMonthSettings(selectedMonth, setupSettingsDraft)
     setSetupStep("work")
     setSection("home")
+    notify(["급여 조건을 반영했어요. 이제 이번 달 근무를 입력해 주세요."])
   }
 
   const completeSetupAndStayHome = () => {
@@ -281,6 +313,7 @@ export function SalaryCalculator() {
     materializeSettingsSnapshots([savedEntry])
     setSelectedMonth(savedEntry.date.slice(0, 7))
     completeSetupAndStayHome()
+    notify([`${Number(savedEntry.date.slice(5, 7))}월 ${Number(savedEntry.date.slice(8))}일 근무를 추가했어요.`])
     return { ok: true as const }
   }
 
@@ -309,6 +342,7 @@ export function SalaryCalculator() {
         </div>
       </div>
 
+      {storageError && <div role="alert" className="mx-auto max-w-6xl px-4 pt-4 text-sm text-red-700">{storageError}</div>}
       <section className="mx-auto max-w-6xl px-4 py-6 pb-24 md:py-8 md:pb-8">
         {section !== "more" && setupCompleted && (
           <div className="mb-6">
@@ -339,6 +373,7 @@ export function SalaryCalculator() {
             onStartSetupDirectWork={openSetupDirectWorkEditor}
             showGuidedSetup={!setupCompleted}
             setupStep={setupStep}
+            onFeedback={notify}
           />
         )}
 
@@ -353,6 +388,7 @@ export function SalaryCalculator() {
             openEditorRequestId={workEditorRequestId}
             onEditorRequestHandled={handleWorkEditorRequestHandled}
             onOpenExcel={() => setMapperOpen(true)}
+            onFeedback={notify}
           />
         )}
 
@@ -371,6 +407,7 @@ export function SalaryCalculator() {
               monthLabel={selectedMonthLabel}
               hasMonthSettingsSnapshot={Boolean(settingsByMonth[selectedMonth])}
               onUpdateMonthSettings={updateMonthSettings}
+              onFeedback={notify}
             />
           </div>
         )}
@@ -427,10 +464,12 @@ export function SalaryCalculator() {
         )}
       </section>
 
+      {!introCompleted && <GuidedIntro onComplete={() => setIntroCompleted(true)} />}
       <ExcelMapperModal
         open={mapperOpen}
         onOpenChange={setMapperOpen}
         onImport={handleImport}
+        selectedMonth={selectedMonth}
       />
       <WorkEntryEditor
         open={setupDirectEditorOpen}
@@ -455,6 +494,7 @@ export function SalaryCalculator() {
           </div>
         </DialogContent>
       </Dialog>
+      {feedback && <ActionToast key={feedback.id} messages={feedback.messages} tone={feedback.tone} />}
     </main>
   )
 }

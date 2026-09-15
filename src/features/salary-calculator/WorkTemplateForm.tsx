@@ -187,26 +187,20 @@ export function WorkTemplateForm({ selectedMonth, onAddEntries, onComplete }: Wo
     }
 
     const result = onAddEntries(newEntries)
-    const messages: string[] = []
-
-    if (result.addedCount > 0) {
-      messages.push(`${result.addedCount}건의 근무를 추가했어요.`)
-    } else if (result.skippedCount > 0) {
-      messages.push("추가된 근무가 없어요.")
+    const messages = result.addedCount === 0
+      ? ["추가할 수 있는 근무가 없어요. 기존 근무와 시간이 겹치는지 확인해 주세요."]
+      : result.skippedCount > 0
+        ? [`${result.addedCount}개를 추가했고, 기존 근무와 겹치는 ${result.skippedCount}개는 제외했어요.`]
+        : [`${result.addedCount}개의 근무 기록을 추가했어요.`]
+    const tone = result.skippedCount > 0 ? "warning" : "success"
+    if (result.addedCount === 0) {
+      setFormErrors(messages)
+    } else if (onComplete) {
+      onComplete(result, messages, tone)
+    } else {
+      setFeedback({ messages, tone })
     }
 
-    if (result.skippedCount > 0) {
-      messages.push(`${result.skippedCount}건은 기존 근무시간과 겹쳐 제외했어요.`)
-    }
-
-    if (messages.length > 0) {
-      const tone = result.skippedCount > 0 ? "warning" : "success"
-      if (onComplete) {
-        onComplete(result, messages, tone)
-      } else {
-        setFeedback({ messages, tone })
-      }
-    }
   }
 
   return (

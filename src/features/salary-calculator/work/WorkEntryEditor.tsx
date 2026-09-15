@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 import type { SalaryBreakdown, SalarySettings, WorkEntry } from "@/types/salary"
 import { calculateSalary } from "@/salary/calculateSalary"
@@ -65,6 +65,7 @@ export function WorkEntryEditor({
   onOpenChange,
   onSave
 }: WorkEntryEditorProps) {
+  const submitted = useRef(false)
   const [timeInputMode, setTimeInputMode] = useState<TimeInputMode>("select")
   const [draft, setDraft] = useState<DraftEntry>(() => emptyDraft(selectedMonth))
   const [errors, setErrors] = useState<Partial<Record<keyof DraftEntry, string>>>({})
@@ -74,6 +75,7 @@ export function WorkEntryEditor({
 
   useEffect(() => {
     if (open) {
+      submitted.current = false
       const nextDraft = entry ? { ...entry } : emptyDraft(selectedMonth)
       setDraft(nextDraft)
       setNoBreak(nextDraft.breakMinutes === 0)
@@ -125,9 +127,11 @@ export function WorkEntryEditor({
   }
 
   const handleSave = () => {
-    if (!validate()) return
+    if (submitted.current || !validate()) return
+    submitted.current = true
     const result = onSave({ id: entry?.id ?? createId(), ...draft })
     if (!result.ok) {
+      submitted.current = false
       setFormMessages(result.messages)
       return
     }

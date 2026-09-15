@@ -6,7 +6,7 @@ import { CalendarPlus, FileSpreadsheet, Plus, Trash2 } from "lucide-react"
 import type { SalarySettings, WorkEntry } from "@/types/salary"
 import { clampMinutes, diffMinutes, formatMinutesToHours } from "@/lib/time"
 import { findWorkEntryConflict } from "@/salary/workEntryConflicts"
-import { ActionToast, type ActionToastTone } from "@/components/ui/action-toast"
+import type { ActionToastTone } from "@/components/ui/action-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -30,11 +30,7 @@ type WorkSectionProps = {
   openEditorRequestId: number | null
   onEditorRequestHandled: () => void
   onOpenExcel: () => void
-}
-
-type WorkFeedback = {
-  messages: string[]
-  tone: ActionToastTone
+  onFeedback: (messages: string[], tone?: ActionToastTone) => void
 }
 
 export function WorkSection({
@@ -46,19 +42,14 @@ export function WorkSection({
   onAddEntries,
   openEditorRequestId,
   onEditorRequestHandled,
-  onOpenExcel
+  onOpenExcel,
+  onFeedback
 }: WorkSectionProps) {
   const [editorOpen, setEditorOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<WorkEntry | null>(null)
   const [deleteEntry, setDeleteEntry] = useState<WorkEntry | null>(null)
   const [templateOpen, setTemplateOpen] = useState(false)
-  const [feedback, setFeedback] = useState<WorkFeedback | null>(null)
 
-  useEffect(() => {
-    if (!feedback) return
-    const timeout = window.setTimeout(() => setFeedback(null), 3000)
-    return () => window.clearTimeout(timeout)
-  }, [feedback])
 
   const monthEntries = useMemo(
     () =>
@@ -105,10 +96,7 @@ export function WorkSection({
       : [...entries, savedEntry]
 
     onChange(nextEntries, [savedEntry])
-    setFeedback({
-      messages: [editingEntry ? "근무 기록을 수정했어요." : "근무가 추가됐어요."],
-      tone: "success"
-    })
+    onFeedback([editingEntry ? "근무 기록을 수정했어요." : `${Number(savedEntry.date.slice(5, 7))}월 ${Number(savedEntry.date.slice(8))}일 근무를 추가했어요.`])
     return { ok: true as const }
   }
 
@@ -116,6 +104,7 @@ export function WorkSection({
     if (!deleteEntry) return
     onChange(entries.filter((entry) => entry.id !== deleteEntry.id))
     setDeleteEntry(null)
+    onFeedback(["근무 기록을 삭제했어요."])
   }
 
   const handleTemplateComplete = (
@@ -125,8 +114,8 @@ export function WorkSection({
   ) => {
     if (result.addedCount > 0) {
       setTemplateOpen(false)
+      onFeedback(messages, tone)
     }
-    setFeedback({ messages, tone })
   }
 
   return (
@@ -249,8 +238,6 @@ export function WorkSection({
           />
         </DialogContent>
       </Dialog>
-
-      {feedback && <ActionToast messages={feedback.messages} tone={feedback.tone} />}
     </div>
   )
 }

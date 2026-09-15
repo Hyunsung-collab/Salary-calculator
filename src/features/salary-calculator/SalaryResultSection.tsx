@@ -8,7 +8,7 @@ import { formatMinutesToHours } from "@/lib/time"
 import type { SalaryBreakdown, SalarySettings, WorkEntry } from "@/types/salary"
 import { PayslipPreview } from "@/components/PayslipPreview"
 import { PayslipReport } from "@/components/PayslipReport"
-import { ActionToast } from "@/components/ui/action-toast"
+import type { ActionToastTone } from "@/components/ui/action-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -28,6 +28,7 @@ type SalaryResultSectionProps = {
   monthLabel: string
   hasMonthSettingsSnapshot: boolean
   onUpdateMonthSettings: (month: string, settings: SalarySettings) => void
+  onFeedback: (messages: string[], tone?: ActionToastTone) => void
 }
 
 const payments: Array<[string, string, keyof SalaryBreakdown]> = [
@@ -55,11 +56,12 @@ export function SalaryResultSection({
   selectedMonth,
   monthLabel,
   hasMonthSettingsSnapshot,
-  onUpdateMonthSettings
+  onUpdateMonthSettings,
+  onFeedback
 }: SalaryResultSectionProps) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsDraft, setSettingsDraft] = useState<SalarySettings>(settings)
-  const [feedback, setFeedback] = useState<string[]>([])
+  const [settingsValid, setSettingsValid] = useState(true)
   const workDays = new Set(entries.map((entry) => entry.date)).size
 
   useEffect(() => {
@@ -68,16 +70,11 @@ export function SalaryResultSection({
     }
   }, [settings, settingsOpen])
 
-  useEffect(() => {
-    if (feedback.length === 0) return
-    const timeout = window.setTimeout(() => setFeedback([]), 3000)
-    return () => window.clearTimeout(timeout)
-  }, [feedback])
 
   const saveMonthSettings = () => {
     onUpdateMonthSettings(selectedMonth, settingsDraft)
     setSettingsOpen(false)
-    setFeedback([`${monthLabel} 급여 조건을 수정했어요.`])
+    onFeedback([`${monthLabel} 급여 조건을 수정했어요.`])
   }
 
   return (
@@ -216,20 +213,18 @@ export function SalaryResultSection({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-5">
-            <SalarySettingsForm settings={settingsDraft} onChange={setSettingsDraft} />
+            <SalarySettingsForm settings={settingsDraft} onChange={setSettingsDraft} onValidityChange={setSettingsValid} />
             <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
               <Button type="button" variant="outline" onClick={() => setSettingsOpen(false)}>
                 취소
               </Button>
-              <Button type="button" onClick={saveMonthSettings}>
+              <Button type="button" disabled={!settingsValid} onClick={saveMonthSettings}>
                 <FileText className="h-4 w-4" /> 저장
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
-
-      {feedback.length > 0 && <ActionToast messages={feedback} />}
     </div>
   )
 }

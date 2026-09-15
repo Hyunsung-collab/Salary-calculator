@@ -3,6 +3,7 @@ export const SALARY_UI_PREFERENCES_KEY = "salary-calculator-ui-preferences"
 export type SalarySetupStep = "settings" | "work" | "result"
 
 export type SalaryUiPreferences = {
+  introCompleted: boolean
   setupCompleted: boolean
   setupStep: SalarySetupStep
   hadStoredPreferences: boolean
@@ -10,6 +11,7 @@ export type SalaryUiPreferences = {
 
 function getDefaultPreferences(): SalaryUiPreferences {
   return {
+    introCompleted: false,
     setupCompleted: false,
     setupStep: "settings",
     hadStoredPreferences: false
@@ -37,6 +39,7 @@ export function loadSalaryUiPreferences(): SalaryUiPreferences {
     if (!isSalaryUiPreferences(parsed)) return getDefaultPreferences()
 
     return {
+      introCompleted: typeof parsed.introCompleted === "boolean" ? parsed.introCompleted : true,
       setupCompleted: parsed.setupCompleted,
       setupStep: normalizeSetupStep((parsed as Record<string, unknown>).setupStep),
       hadStoredPreferences: true
@@ -52,6 +55,7 @@ export function saveSalaryUiPreferences(preferences: Partial<Omit<SalaryUiPrefer
   window.localStorage.setItem(
     SALARY_UI_PREFERENCES_KEY,
     JSON.stringify({
+      introCompleted: preferences.introCompleted ?? current.introCompleted,
       setupCompleted: preferences.setupCompleted ?? current.setupCompleted,
       setupStep: preferences.setupStep ?? current.setupStep
     })

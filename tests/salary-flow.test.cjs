@@ -65,3 +65,47 @@ test('month utilities handle leap year and year boundary', () => {
   assert.equal(shiftMonthKey('2026-12',1),'2027-01');
   assert.equal(shiftMonthKey('2026-01',-1),'2025-12');
 });
+
+
+test('compact keyboard times normalize only when valid; invalid drafts stay invalid', () => {
+  const { normalizeTimeInput } = load('src/lib/workTimeValidation.ts');
+  for (const [raw, expected] of [['900','09:00'],['930','09:30'],['1830','18:30'],['000','00:00'],['2359','23:59'],[' 09:30 ','09:30']]) {
+    assert.equal(normalizeTimeInput(raw),expected);
+    assert.equal(isValidTime(normalizeTimeInput(raw)),true);
+  }
+  for (const raw of ['2430','2500','1290','9abc','abcd','12:75','9','']) {
+    assert.equal(normalizeTimeInput(raw),raw);
+    assert.equal(isValidTime(normalizeTimeInput(raw)),false);
+  }
+});
+test('intro preferences distinguish fresh, legacy, resumed and reset users', () => {
+  const {loadSalaryUiPreferences,saveSalaryUiPreferences,SALARY_UI_PREFERENCES_KEY:key}=load('src/lib/uiPreferences.ts');
+  const local=new Map();global.window={localStorage:{getItem:k=>local.get(k)??null,setItem:(k,v)=>local.set(k,v)}};
+  try {
+    assert.equal(loadSalaryUiPreferences().introCompleted,false);
+    local.set(key,JSON.stringify({setupCompleted:false,setupStep:'work'}));
+    assert.equal(loadSalaryUiPreferences().introCompleted,true);
+    assert.equal(loadSalaryUiPreferences().setupStep,'work');
+    saveSalaryUiPreferences({introCompleted:true,setupCompleted:false,setupStep:'work'});
+    assert.equal(loadSalaryUiPreferences().introCompleted,true);
+    assert.equal(loadSalaryUiPreferences().setupCompleted,false);
+    saveSalaryUiPreferences({setupCompleted:false,setupStep:'settings'});
+    assert.equal(loadSalaryUiPreferences().introCompleted,true);
+    assert.equal(loadSalaryUiPreferences().setupStep,'settings');
+    local.set(key,'broken');assert.equal(loadSalaryUiPreferences().introCompleted,false);
+  } finally {delete global.window;}
+});
+test('download workbook roundtrips XLSX with parser-compatible example values', () => {
+  const XLSX=require('xlsx');
+  const {createWorkTemplateWorkbook,EXCEL_TEMPLATE_FILENAME}=load('src/lib/excelTemplate.ts');
+  const book=createWorkTemplateWorkbook('2026-09');
+  const reread=XLSX.read(XLSX.write(book,{type:'buffer',bookType:'xlsx'}),{type:'buffer'});
+  assert.match(EXCEL_TEMPLATE_FILENAME,/\.xlsx$/);
+  assert.deepEqual(reread.SheetNames,['근무 기록']);
+  const rows=XLSX.utils.sheet_to_json(reread.Sheets[reread.SheetNames[0]],{header:1});
+  assert.deepEqual(rows,[['날짜','출근','퇴근','휴게(분)'],['2026-09-01','09:00','18:00',60],['2026-09-02','13:00','22:00',60]]);
+  for (const [date,startTime,endTime,breakMinutes] of rows.slice(1)) {
+    assert.match(date,/^2026-09-0[12]$/);
+    assert.deepEqual(validateWorkTime({startTime,endTime,breakMinutes}),{});
+  }
+});

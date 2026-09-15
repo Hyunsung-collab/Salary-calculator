@@ -8,6 +8,15 @@ export function isValidTime(value: string) {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(value)
 }
 
+// Normalize only completed input; invalid text stays editable and is rejected at save.
+export function normalizeTimeInput(value: string) {
+  const trimmed = value.trim()
+  const candidate = /^\d{3,4}$/.test(trimmed)
+    ? `${trimmed.slice(0, -2).padStart(2, "0")}:${trimmed.slice(-2)}`
+    : trimmed
+  return isValidTime(candidate) ? candidate : value
+}
+
 export function validateWorkTime(value: WorkTime): WorkTimeErrors {
   const errors: WorkTimeErrors = {}
   if (!isValidTime(value.startTime)) errors.startTime = "출근 시간을 00:00~23:59 형식으로 입력해 주세요."
