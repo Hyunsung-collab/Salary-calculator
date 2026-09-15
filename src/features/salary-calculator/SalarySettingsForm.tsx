@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type ChangeEvent } from "react"
+import { useEffect, useState, type ChangeEvent } from "react"
 
 import type { SalarySettings } from "@/types/salary"
 import { Input } from "@/components/ui/input"
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 type Props = {
   settings: SalarySettings
   onChange: (settings: SalarySettings) => void
+  onValidityChange?: (valid: boolean) => void
 }
 
 type NumericKey =
@@ -34,9 +35,13 @@ const deductionOptions: Array<[keyof SalarySettings, string]> = [
   ["applyLocalIncomeTax", "지방소득세 적용"]
 ]
 
-export function SalarySettingsForm({ settings, onChange }: Props) {
+export function SalarySettingsForm({ settings, onChange, onValidityChange }: Props) {
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [errors, setErrors] = useState<Partial<Record<NumericKey, string>>>({})
+
+  useEffect(() => {
+    onValidityChange?.(!Object.values(errors).some(Boolean))
+  }, [errors, onValidityChange])
 
   const updateNumber = (key: NumericKey, event: ChangeEvent<HTMLInputElement>) => {
     const value = Number(event.target.value)
@@ -51,17 +56,26 @@ export function SalarySettingsForm({ settings, onChange }: Props) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h3 className="font-semibold text-slate-800">기본 설정</h3>
-        <p className="mt-1 text-sm text-slate-500">
-          현재 계산기가 지원하는 시급과 기본 수당을 설정하세요.
-        </p>
-      </div>
       <div className="grid gap-4 md:grid-cols-2">
         <NumberField id="hourlyWage" label="기본 시급" value={settings.hourlyWage} error={errors.hourlyWage} onChange={(event) => updateNumber("hourlyWage", event)} />
         <NumberField id="mealAllowance" label="식대(비과세)" value={settings.mealAllowance} error={errors.mealAllowance} onChange={(event) => updateNumber("mealAllowance", event)} />
-        <NumberField id="bonusAllowance" label="추가수당(고정)" value={settings.bonusAllowance} error={errors.bonusAllowance} disabled={!settings.applyBonusAllowance} onChange={(event) => updateNumber("bonusAllowance", event)} />
+        {settings.applyBonusAllowance && <NumberField id="bonusAllowance" label="추가수당(고정)" value={settings.bonusAllowance} error={errors.bonusAllowance} disabled={!settings.applyBonusAllowance} onChange={(event) => updateNumber("bonusAllowance", event)} />}
       </div>
+      <fieldset className="grid gap-2 rounded-md border border-slate-200 p-4 md:grid-cols-2">
+        <legend className="px-1 text-sm font-medium">수당과 공제</legend>
+        {allowanceOptions.map(([key, label]) => (
+          <Toggle key={key} label={label} checked={settings[key] as boolean} onChange={(event) => updateBoolean(key, event)} />
+        ))}
+        <Toggle label="공제 적용" checked={settings.applyDeductions} onChange={(event) => updateBoolean("applyDeductions", event)} />
+      </fieldset>
+      {settings.applyDeductions && (
+        <fieldset className="grid gap-2 rounded-md bg-slate-50 p-4 md:grid-cols-2">
+          <legend className="px-1 text-sm font-medium">공제 항목 선택</legend>
+          {deductionOptions.map(([key, label]) => (
+            <Toggle key={key} label={label} checked={settings[key] as boolean} onChange={(event) => updateBoolean(key, event)} />
+          ))}
+        </fieldset>
+      )}
       <div className="rounded-md border border-slate-200">
         <button
           type="button"
@@ -69,28 +83,14 @@ export function SalarySettingsForm({ settings, onChange }: Props) {
           aria-expanded={advancedOpen}
           onClick={() => setAdvancedOpen((open) => !open)}
         >
-          고급 설정 <span aria-hidden="true">{advancedOpen ? "−" : "+"}</span>
+          수당 배율 설정 <span aria-hidden="true">{advancedOpen ? "−" : "+"}</span>
         </button>
         {advancedOpen && (
           <div className="space-y-5 border-t border-slate-200 p-4 text-sm">
-            <div className="grid gap-3 md:grid-cols-2">
-              {allowanceOptions.map(([key, label]) => (
-                <Toggle key={key} label={label} checked={settings[key] as boolean} onChange={(event) => updateBoolean(key, event)} />
-              ))}
-            </div>
             <div className="grid gap-4 border-t border-slate-200 pt-4 md:grid-cols-2">
               <NumberField id="overtimeMultiplier" label="연장수당 배율" value={settings.overtimeMultiplier} error={errors.overtimeMultiplier} onChange={(event) => updateNumber("overtimeMultiplier", event)} />
               <NumberField id="nightMultiplier" label="야간수당 배율" value={settings.nightMultiplier} error={errors.nightMultiplier} onChange={(event) => updateNumber("nightMultiplier", event)} />
             </div>
-            <div className="grid gap-3 border-t border-slate-200 pt-4 md:grid-cols-2">
-              <Toggle label="공제 적용" checked={settings.applyDeductions} onChange={(event) => updateBoolean("applyDeductions", event)} />
-              {deductionOptions.map(([key, label]) => (
-                <Toggle key={key} label={label} checked={settings[key] as boolean} disabled={!settings.applyDeductions} onChange={(event) => updateBoolean(key, event)} />
-              ))}
-            </div>
-            <p className="text-xs text-slate-500">
-              일급·월급·연봉, 휴일수당, 사용자 지정 공제는 현재 지원하지 않습니다.
-            </p>
           </div>
         )}
       </div>

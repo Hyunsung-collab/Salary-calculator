@@ -124,9 +124,11 @@ export function SalaryCalculator() {
     }
     const preferences = loadSalaryUiPreferences()
     const legacyExistingUser = !preferences.hadStoredPreferences && Boolean(saved?.entries.length)
-    const nextSetupCompleted = preferences.setupCompleted || legacyExistingUser
+    const nextSetupCompleted = preferences.setupCompleted || legacyExistingUser ||
+      (preferences.setupStep === "result" && Boolean(saved?.entries.length))
     setSetupCompleted(nextSetupCompleted)
-    setSetupStep(nextSetupCompleted ? "result" : preferences.setupStep)
+    const resumedStep = preferences.setupStep === "result" ? "work" : preferences.setupStep
+    setSetupStep(nextSetupCompleted ? "result" : saved ? resumedStep : "settings")
     setIsHydrated(true)
   }, [])
 
@@ -183,6 +185,8 @@ export function SalaryCalculator() {
     setDefaultSettings(appDefaultSettings)
     setSettingsByMonth({})
     setSetupCompleted(false)
+    setSection("home")
+    setSelectedMonth(getCurrentMonthKey())
     setSetupStep("settings")
     setSetupSettingsDraft(appDefaultSettings)
     setSetupDirectEditorOpen(false)
@@ -224,7 +228,7 @@ export function SalaryCalculator() {
       setEntries([...entries, ...acceptedEntries])
       materializeSettingsSnapshots(acceptedEntries)
       if (!setupCompleted) {
-        setSetupStep("result")
+        completeSetupAndStayHome()
       }
     }
 
@@ -250,15 +254,9 @@ export function SalaryCalculator() {
     setSection("home")
   }
 
-  const completeSetupAndOpenSalary = () => {
-    setSetupCompleted(true)
-    saveSalaryUiPreferences({ setupCompleted: true, setupStep: "result" })
-    setSection("salary")
-  }
-
   const completeSetupAndStayHome = () => {
+    setSetupStep("result")
     setSetupCompleted(true)
-    saveSalaryUiPreferences({ setupCompleted: true, setupStep: "result" })
     setSection("home")
   }
 
@@ -281,7 +279,8 @@ export function SalaryCalculator() {
 
     setEntries([...entries, savedEntry])
     materializeSettingsSnapshots([savedEntry])
-    setSetupStep("result")
+    setSelectedMonth(savedEntry.date.slice(0, 7))
+    completeSetupAndStayHome()
     return { ok: true as const }
   }
 
@@ -289,8 +288,16 @@ export function SalaryCalculator() {
     setEntries(nextEntries)
     materializeSettingsSnapshots(materializedEntries)
     if (!setupCompleted && nextEntries.length > entries.length) {
-      setSetupStep("result")
+      completeSetupAndStayHome()
     }
+  }
+
+  if (!isHydrated) {
+    return (
+      <main className="min-h-screen bg-slate-50 px-4 py-12" aria-busy="true">
+        <p role="status" className="text-center text-slate-500">급여 정보를 불러오는 중이에요.</p>
+      </main>
+    )
   }
 
   return (
@@ -298,7 +305,7 @@ export function SalaryCalculator() {
       <div className="no-print border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
           <p className="text-lg font-semibold text-slate-900">하이브리드 급여 계산기</p>
-          <SalaryAppNavigation section={section} onSectionChange={setSection} />
+          {setupCompleted && <SalaryAppNavigation section={section} onSectionChange={setSection} />}
         </div>
       </div>
 
@@ -322,7 +329,7 @@ export function SalaryCalculator() {
             lastSavedAt={lastSavedAt}
             onGoToWork={() => setSection("work")}
             onStartFirstWork={requestWorkEntryEditor}
-            onGoToSalary={setupStep === "result" && !setupCompleted ? completeSetupAndOpenSalary : () => setSection("salary")}
+            onGoToSalary={() => setSection("salary")}
             onGoToSettings={() => setSection("more")}
             selectedMonth={selectedMonth}
             setupSettings={setupSettingsDraft}
@@ -330,8 +337,7 @@ export function SalaryCalculator() {
             onConfirmSetupSettings={confirmSetupSettings}
             onAddTemplateEntries={addTemplateEntries}
             onStartSetupDirectWork={openSetupDirectWorkEditor}
-            onCompleteSetup={completeSetupAndStayHome}
-            showGuidedSetup={isHydrated && !setupCompleted}
+            showGuidedSetup={!setupCompleted}
             setupStep={setupStep}
           />
         )}

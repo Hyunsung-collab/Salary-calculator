@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react"
 
 import type { WorkEntry } from "@/types/salary"
 import { getMonthEndDate, getMonthStartDate } from "@/lib/month"
-import { HALF_HOUR_OPTIONS } from "@/lib/time"
+import { validateWorkTime } from "@/lib/workTimeValidation"
+import { TimeInput, TimeInputModeControl, type TimeInputMode } from "@/features/salary-calculator/TimeInput"
 import { ActionToast, type ActionToastTone } from "@/components/ui/action-toast"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -53,8 +54,11 @@ export function WorkTemplateForm({ selectedMonth, onAddEntries, onComplete }: Wo
   const [commonTemplate, setCommonTemplate] = useState<WorkTemplate>(createDefaultTemplate)
   const [lastCommonBreakMinutes, setLastCommonBreakMinutes] = useState(60)
   const [commonNoBreak, setCommonNoBreak] = useState(false)
+  const [lastBreakByDay, setLastBreakByDay] = useState<Record<number, number>>({})
   const [templateByDay, setTemplateByDay] = useState<Record<number, WorkTemplate>>({})
   const [customWeekdayTemplatesOpen, setCustomWeekdayTemplatesOpen] = useState(false)
+  const [timeInputMode, setTimeInputMode] = useState<TimeInputMode>("select")
+  const [formErrors, setFormErrors] = useState<string[]>([])
   const [feedback, setFeedback] = useState<TemplateFeedback | null>(null)
   const selectedWeekdays = useMemo(() => sortWeekdays(templateWeekdays), [templateWeekdays])
 
@@ -70,7 +74,7 @@ export function WorkTemplateForm({ selectedMonth, onAddEntries, onComplete }: Wo
   }, [feedback])
 
   const getTemplateForDay = (day: number) =>
-    customWeekdayTemplatesOpen ? templateByDay[day] ?? commonTemplate : commonTemplate
+    templateByDay[day] ?? commonTemplate
 
   const createEntry = (date: string, day: number): WorkEntry => {
     const id =
@@ -110,6 +114,9 @@ export function WorkTemplateForm({ selectedMonth, onAddEntries, onComplete }: Wo
   }
 
   const updateTemplateForDay = (day: number, patch: Partial<WorkTemplate>) => {
+    if (patch.breakMinutes !== undefined && patch.breakMinutes > 0) {
+      setLastBreakByDay((previous) => ({ ...previous, [day]: patch.breakMinutes! }))
+    }
     setTemplateByDay((previous) => {
       const current = previous[day] ?? commonTemplate
       return {
@@ -136,10 +143,28 @@ export function WorkTemplateForm({ selectedMonth, onAddEntries, onComplete }: Wo
   }
 
   const addTemplateEntries = () => {
-    if (!rangeStart || !rangeEnd || templateWeekdays.length === 0) return
+    setFormErrors([])
+    if (!rangeStart || !rangeEnd || templateWeekdays.length === 0) {
+      setFormErrors(["적용 기간과 근무 요일을 선택해 주세요."])
+      return
+    }
+    const errors = selectedWeekdays.flatMap((day) =>
+      Object.values(validateWorkTime(getTemplateForDay(day))).map((message) => `${weekdayLabels[day]}요일: ${message}`)
+    )
+    if (errors.length) {
+      setFormErrors(errors)
+      return
+    }
+    if (rangeStart < getMonthStartDate(selectedMonth) || rangeEnd > getMonthEndDate(selectedMonth)) {
+      setFormErrors(["선택한 달 안에서 적용 기간을 지정해 주세요."])
+      return
+    }
     const start = new Date(`${rangeStart}T00:00:00`)
     const end = new Date(`${rangeEnd}T00:00:00`)
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) return
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+      setFormErrors(["종료일은 시작일과 같거나 이후여야 해요."])
+      return
+    }
 
     const formatLocalDate = (value: Date) =>
       `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(
@@ -156,7 +181,10 @@ export function WorkTemplateForm({ selectedMonth, onAddEntries, onComplete }: Wo
       cursor.setDate(cursor.getDate() + 1)
     }
 
-    if (newEntries.length === 0) return
+    if (newEntries.length === 0) {
+      setFormErrors(["이 기간에는 선택한 요일이 없어요. 기간이나 요일을 바꿔 주세요."])
+      return
+    }
 
     const result = onAddEntries(newEntries)
     const messages: string[] = []
@@ -193,21 +221,22 @@ export function WorkTemplateForm({ selectedMonth, onAddEntries, onComplete }: Wo
         <div className="grid gap-3 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="rangeStart">적용 시작일</Label>
-            <Input id="rangeStart" type="date" value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} />
+            <Input id="rangeStart" type="date" min={getMonthStartDate(selectedMonth)} max={getMonthEndDate(selectedMonth)} value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="rangeEnd">적용 종료일</Label>
-            <Input id="rangeEnd" type="date" value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} />
+            <Input id="rangeEnd" type="date" min={getMonthStartDate(selectedMonth)} max={getMonthEndDate(selectedMonth)} value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} />
           </div>
         </div>
-        <div className="grid gap-3 md:grid-cols-3">
+        <TimeInputModeControl mode={timeInputMode} onChange={setTimeInputMode} />
+        <div className="grid gap-4 lg:grid-cols-3">
           <div className="space-y-2">
             <Label>근무 요일</Label>
             <div className="flex flex-wrap gap-2">
               {orderedWeekdays.map((day) => (
                 <label
                   key={day}
-                  className={`flex items-center gap-2 rounded-full border px-3 py-1 text-sm ${
+                  className={`flex min-h-11 items-center gap-2 rounded-full border px-3 py-1 text-sm focus-within:ring-2 focus-within:ring-slate-400 ${
                     templateWeekdays.includes(day)
                       ? "border-slate-900 bg-slate-900 text-white"
                       : "border-slate-200 text-slate-600"
@@ -215,7 +244,7 @@ export function WorkTemplateForm({ selectedMonth, onAddEntries, onComplete }: Wo
                 >
                   <input
                     type="checkbox"
-                    className="hidden"
+                    className="sr-only"
                     checked={templateWeekdays.includes(day)}
                     onChange={(event) => toggleWeekday(day, event.target.checked)}
                   />
@@ -224,27 +253,14 @@ export function WorkTemplateForm({ selectedMonth, onAddEntries, onComplete }: Wo
               ))}
             </div>
           </div>
-          <div className="space-y-3 md:col-span-2">
+          <div className="space-y-3 lg:col-span-2">
             <Label>공통 근무시간</Label>
             <div className="grid gap-2 rounded-md border border-slate-200 bg-white p-3 md:grid-cols-3">
-              <select
-                aria-label="공통 출근 시간"
-                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                value={commonTemplate.startTime}
-                onChange={(event) => updateCommonTemplate({ startTime: event.target.value })}
-              >
-                {HALF_HOUR_OPTIONS.map((time) => <option key={time} value={time}>{time}</option>)}
-              </select>
-              <select
-                aria-label="공통 퇴근 시간"
-                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                value={commonTemplate.endTime}
-                onChange={(event) => updateCommonTemplate({ endTime: event.target.value })}
-              >
-                {HALF_HOUR_OPTIONS.map((time) => <option key={time} value={time}>{time}</option>)}
-              </select>
+              <TimeInput label="공통 출근 시간" mode={timeInputMode} value={commonTemplate.startTime} onChange={(value) => updateCommonTemplate({ startTime: value })} />
+              <TimeInput label="공통 퇴근 시간" mode={timeInputMode} value={commonTemplate.endTime} onChange={(value) => updateCommonTemplate({ endTime: value })} />
               <div className="space-y-2">
-                <Input
+                <Label htmlFor="common-break">휴게시간(분)</Label>
+                <Input id="common-break"
                   aria-label="공통 휴게시간 분"
                   type="number"
                   inputMode="numeric"
@@ -279,7 +295,7 @@ export function WorkTemplateForm({ selectedMonth, onAddEntries, onComplete }: Wo
               <div>
                 <p className="text-sm font-medium text-slate-800">요일별 예외 설정</p>
                 <p className="text-xs text-slate-500">
-                  특정 요일만 시간이 다를 때 열어서 수정하세요.
+                  특정 요일만 다르게 설정하세요. 접어도 요일별 설정은 유지돼요.
                 </p>
               </div>
               <Button
@@ -309,22 +325,10 @@ export function WorkTemplateForm({ selectedMonth, onAddEntries, onComplete }: Wo
                       <div className="flex items-center text-sm font-medium text-slate-700">
                         {weekdayLabels[day]}요일
                       </div>
-                      <select
-                        aria-label={`${weekdayLabels[day]}요일 출근 시간`}
-                        className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                        value={template.startTime}
-                        onChange={(event) => updateTemplateForDay(day, { startTime: event.target.value })}
-                      >
-                        {HALF_HOUR_OPTIONS.map((time) => <option key={time} value={time}>{time}</option>)}
-                      </select>
-                      <select
-                        aria-label={`${weekdayLabels[day]}요일 퇴근 시간`}
-                        className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                        value={template.endTime}
-                        onChange={(event) => updateTemplateForDay(day, { endTime: event.target.value })}
-                      >
-                        {HALF_HOUR_OPTIONS.map((time) => <option key={time} value={time}>{time}</option>)}
-                      </select>
+                      <TimeInput label={`${weekdayLabels[day]}요일 출근 시간`} mode={timeInputMode} value={template.startTime} onChange={(value) => updateTemplateForDay(day, { startTime: value })} />
+                      <TimeInput label={`${weekdayLabels[day]}요일 퇴근 시간`} mode={timeInputMode} value={template.endTime} onChange={(value) => updateTemplateForDay(day, { endTime: value })} />
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">휴게시간(분)</p>
                       <Input
                         aria-label={`${weekdayLabels[day]}요일 휴게시간 분`}
                         type="number"
@@ -335,6 +339,14 @@ export function WorkTemplateForm({ selectedMonth, onAddEntries, onComplete }: Wo
                           updateTemplateForDay(day, { breakMinutes: Number(event.target.value) })
                         }
                       />
+                        <label className="flex min-h-10 items-center gap-2 text-sm text-slate-600">
+                          <input type="checkbox" checked={template.breakMinutes === 0} aria-label={`${weekdayLabels[day]}요일 휴게시간 없음`} onChange={(event) => {
+                            if (event.target.checked && template.breakMinutes > 0) setLastBreakByDay((previous) => ({ ...previous, [day]: template.breakMinutes }))
+                            updateTemplateForDay(day, { breakMinutes: event.target.checked ? 0 : lastBreakByDay[day] || commonTemplate.breakMinutes || 60 })
+                          }} />
+                          휴게시간 없음
+                        </label>
+                      </div>
                     </div>
                   )
                 })}
@@ -343,13 +355,16 @@ export function WorkTemplateForm({ selectedMonth, onAddEntries, onComplete }: Wo
           </div>
         )}
 
+        <p className="text-sm text-slate-500">퇴근이 출근보다 이르면 다음 날 퇴근으로 계산해요.</p>
+        {formErrors.length > 0 && <div role="alert" className="space-y-1 rounded-md bg-red-50 p-3 text-sm text-red-700">{formErrors.map((message) => <p key={message}>{message}</p>)}</div>}
         <div className="flex justify-end">
           <Button
             type="button"
+            className="min-h-12 w-full sm:w-auto"
             onClick={addTemplateEntries}
             disabled={!rangeStart || !rangeEnd || templateWeekdays.length === 0}
           >
-            이번 달 근무 만들기
+            {Number(selectedMonth.slice(5, 7))}월 근무 생성
           </Button>
         </div>
       </CardContent>

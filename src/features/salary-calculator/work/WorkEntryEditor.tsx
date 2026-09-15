@@ -6,12 +6,13 @@ import type { SalaryBreakdown, SalarySettings, WorkEntry } from "@/types/salary"
 import { calculateSalary } from "@/salary/calculateSalary"
 import { getDefaultDateForMonth } from "@/lib/month"
 import {
-  HALF_HOUR_OPTIONS,
   clampMinutes,
   diffMinutes,
   formatMinutesToHours,
   getNightMinutes
 } from "@/lib/time"
+import { validateWorkTime, isValidTime } from "@/lib/workTimeValidation"
+import { TimeInput, TimeInputModeControl, type TimeInputMode } from "@/features/salary-calculator/TimeInput"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -48,7 +49,7 @@ function emptyDraft(selectedMonth: string): DraftEntry {
 }
 
 function getPreviewBreakdown(draft: DraftEntry, settings: SalarySettings): SalaryBreakdown | null {
-  if (!draft.date || !draft.startTime || !draft.endTime) return null
+  if (!draft.date || Object.keys(validateWorkTime(draft)).length > 0) return null
   const workedMinutes = clampMinutes(
     diffMinutes(draft.startTime, draft.endTime) - clampMinutes(draft.breakMinutes)
   )
@@ -64,6 +65,7 @@ export function WorkEntryEditor({
   onOpenChange,
   onSave
 }: WorkEntryEditorProps) {
+  const [timeInputMode, setTimeInputMode] = useState<TimeInputMode>("select")
   const [draft, setDraft] = useState<DraftEntry>(() => emptyDraft(selectedMonth))
   const [errors, setErrors] = useState<Partial<Record<keyof DraftEntry, string>>>({})
   const [formMessages, setFormMessages] = useState<string[]>([])
@@ -83,9 +85,9 @@ export function WorkEntryEditor({
 
   const preview = useMemo(() => getPreviewBreakdown(draft, settings), [draft, settings])
   const crossesMidnight =
-    Boolean(draft.startTime && draft.endTime) && draft.endTime < draft.startTime
+    isValidTime(draft.startTime) && isValidTime(draft.endTime) && draft.endTime < draft.startTime
   const nightMinutes =
-    draft.startTime && draft.endTime ? getNightMinutes(draft.startTime, draft.endTime) : 0
+    isValidTime(draft.startTime) && isValidTime(draft.endTime) ? getNightMinutes(draft.startTime, draft.endTime) : 0
 
   const updateDraft = <K extends keyof DraftEntry>(key: K, value: DraftEntry[K]) => {
     setDraft((previous) => ({ ...previous, [key]: value }))
@@ -116,16 +118,8 @@ export function WorkEntryEditor({
   }
 
   const validate = () => {
-    const nextErrors: Partial<Record<keyof DraftEntry, string>> = {}
+    const nextErrors: Partial<Record<keyof DraftEntry, string>> = validateWorkTime(draft)
     if (!draft.date) nextErrors.date = "날짜를 선택해 주세요."
-    if (!draft.startTime) nextErrors.startTime = "출근 시간을 선택해 주세요."
-    if (!draft.endTime) nextErrors.endTime = "퇴근 시간을 선택해 주세요."
-    if (!Number.isFinite(draft.breakMinutes) || draft.breakMinutes < 0) {
-      nextErrors.breakMinutes = "휴게시간은 0분 이상이어야 합니다."
-    }
-    if (!nextErrors.startTime && !nextErrors.endTime && !preview) {
-      nextErrors.endTime = "퇴근 시간과 휴게시간을 확인해 주세요."
-    }
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
@@ -163,65 +157,10 @@ export function WorkEntryEditor({
             {errors.date && <p id="work-entry-date-error" className="text-sm text-red-600">{errors.date}</p>}
           </div>
 
-          <fieldset className="space-y-2">
-            <legend className="text-sm font-medium">근무 템플릿</legend>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setDraft((previous) => ({ ...previous, startTime: "09:00", endTime: "18:00", breakMinutes: 60 }))
-                  setNoBreak(false)
-                  setLastBreakMinutes(60)
-                  setFormMessages([])
-                }}
-              >
-                기본 근무
-              </Button>
-              <Button type="button" variant="outline" onClick={() => setDraft((previous) => ({ ...previous }))}>
-                직접 입력
-              </Button>
-            </div>
-            <p className="text-xs text-slate-500">
-              저장된 이름 있는 템플릿은 아직 없어요. 기존 기본 근무값을 빠른 선택으로 제공합니다.
-            </p>
-          </fieldset>
-
+          <TimeInputModeControl mode={timeInputMode} onChange={setTimeInputMode} />
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="work-entry-start">출근 시간</Label>
-              <select
-                id="work-entry-start"
-                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                value={draft.startTime}
-                aria-invalid={Boolean(errors.startTime)}
-                aria-describedby={errors.startTime ? "work-entry-start-error" : undefined}
-                onChange={(event) => updateDraft("startTime", event.target.value)}
-              >
-                <option value="">선택</option>
-                {HALF_HOUR_OPTIONS.map((value) => (
-                  <option key={value} value={value}>{value}</option>
-                ))}
-              </select>
-              {errors.startTime && <p id="work-entry-start-error" className="text-sm text-red-600">{errors.startTime}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="work-entry-end">퇴근 시간</Label>
-              <select
-                id="work-entry-end"
-                className="flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                value={draft.endTime}
-                aria-invalid={Boolean(errors.endTime)}
-                aria-describedby={errors.endTime ? "work-entry-end-error" : undefined}
-                onChange={(event) => updateDraft("endTime", event.target.value)}
-              >
-                <option value="">선택</option>
-                {HALF_HOUR_OPTIONS.map((value) => (
-                  <option key={value} value={value}>{value}</option>
-                ))}
-              </select>
-              {errors.endTime && <p id="work-entry-end-error" className="text-sm text-red-600">{errors.endTime}</p>}
-            </div>
+            <TimeInput label="출근 시간" value={draft.startTime} mode={timeInputMode} onChange={(value) => updateDraft("startTime", value)} error={errors.startTime} />
+            <TimeInput label="퇴근 시간" value={draft.endTime} mode={timeInputMode} onChange={(value) => updateDraft("endTime", value)} error={errors.endTime} />
           </div>
 
           <div className="space-y-2">
