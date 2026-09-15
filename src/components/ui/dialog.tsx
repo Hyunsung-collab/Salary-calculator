@@ -33,13 +33,13 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-1/2 top-1/2 z-50 w-[92vw] max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-6 shadow-xl",
+        "fixed left-1/2 top-1/2 z-50 flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-y-auto rounded-lg bg-white p-4 shadow-xl sm:p-6",
         className
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-full p-2 text-slate-500 hover:bg-slate-100">
+      <DialogPrimitive.Close aria-label="닫기" className="absolute right-4 top-4 min-h-10 min-w-10 rounded-full p-2 text-slate-500 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
         <X className="h-4 w-4" />
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
@@ -53,18 +53,18 @@ const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
 DialogHeader.displayName = "DialogHeader"
 
 const DialogTitle = React.forwardRef<
-  HTMLHeadingElement,
-  React.HTMLAttributes<HTMLHeadingElement>
+  React.ElementRef<typeof DialogPrimitive.Title>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
 >(({ className, ...props }, ref) => (
-  <h2 ref={ref} className={cn("text-lg font-semibold", className)} {...props} />
+  <DialogPrimitive.Title ref={ref} className={cn("pr-10 text-lg font-semibold", className)} {...props} />
 ))
 DialogTitle.displayName = "DialogTitle"
 
 const DialogDescription = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLParagraphElement>
+  React.ElementRef<typeof DialogPrimitive.Description>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
 >(({ className, ...props }, ref) => (
-  <p ref={ref} className={cn("text-sm text-slate-500", className)} {...props} />
+  <DialogPrimitive.Description ref={ref} className={cn("text-sm text-slate-500", className)} {...props} />
 ))
 DialogDescription.displayName = "DialogDescription"
 

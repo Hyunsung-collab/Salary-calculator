@@ -6,13 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 type PayslipPreviewProps = {
   breakdown: SalaryBreakdown
   settings: SalarySettings
+  monthLabel: string
 }
 
-export function PayslipPreview({ breakdown, settings }: PayslipPreviewProps) {
+export function PayslipPreview({ breakdown, settings, monthLabel }: PayslipPreviewProps) {
   return (
     <Card className="print:border-none print:shadow-none">
       <CardHeader>
-        <CardTitle>급여명세서 미리보기</CardTitle>
+        <CardTitle>{monthLabel} 급여명세서 미리보기</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid gap-4 md:grid-cols-2">
